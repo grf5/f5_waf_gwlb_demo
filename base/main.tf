@@ -111,10 +111,6 @@ resource "aws_route_table" "rtWebAppVpc" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.WebAppVpcIgw.id
   }
-  route {
-    cidr_block         = "10.0.0.0/8"
-    transit_gateway_id = aws_ec2_transit_gateway.tgw.id
-  }
   tags = {
     Name  = "${var.projectPrefix}-rtWebAppVpc-${random_id.buildSuffix.hex}"
     Owner = var.resourceOwner
