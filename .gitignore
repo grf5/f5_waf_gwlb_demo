@@ -1,7 +1,9 @@
 # Custom config files
 admin.auto.tfvars
+**/.terraform.lock.hcl
 
 # Local .terraform directories
+**/.terraform/
 **/.terraform/*
 
 # .tfstate files
