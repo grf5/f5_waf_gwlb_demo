@@ -1,4 +1,4 @@
-resourceOwner    = "g-rob"
+resourceOwner    = "this-guy"
 awsRegion        = "us-east-2"
 sshPublicKey     = "ssh-rsa AAA"
-projectPrefix    = "comcast-waf-gwlb"
+projectPrefix    = "waf-gwlb"
