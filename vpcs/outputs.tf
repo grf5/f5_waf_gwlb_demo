@@ -1,4 +1,3 @@
-/*
 output "jumphostPublicIp" {
   description = "List of public ip's for the jumphosts"
   value       = module.jumphost[*]
@@ -12,4 +11,3 @@ output "bigipPassword" {
   description = "Password for the admin usernmae"
   value       = module.gwlb-bigip.bigipPassword
 }
-*/
