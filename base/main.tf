@@ -21,6 +21,7 @@ resource "aws_vpc" "WebAppVpc" {
   }
 }
 
+/*
 # Subnets
 
 resource "aws_subnet" "subnetInternetNatgAz1" {
@@ -177,11 +178,6 @@ resource "aws_route_table_association" "WebAppVpcTgwAttachmentSubnetAz2RtbAssoci
 }
 ##################################################################### Internet VPC #############################################################
 
-
-
-
-
-/*
 ##################################################################### Transit gateway #############################################################
 resource "aws_ec2_transit_gateway" "tgw" {
   description                     = "Transit Gateway"
