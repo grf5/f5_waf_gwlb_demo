@@ -13,6 +13,9 @@ locals {
 ##################################################################### Locals #############################################################
 
 ##################################################################### Web App VPC #############################################################
+
+# VPC
+
 resource "aws_vpc" "WebAppVpc" {
   cidr_block = "10.1.0.0/16"
   tags = {
@@ -25,7 +28,7 @@ resource "aws_vpc" "WebAppVpc" {
 
 resource "aws_subnet" "subnetGWLBeAz1" {
   vpc_id            = aws_vpc.WebAppVpc.id
-  cidr_block        = "10.1.10.0/24"
+  cidr_block        = "10.1.1.0/24"
   availability_zone = local.awsAz1
 
   tags = {
@@ -36,7 +39,7 @@ resource "aws_subnet" "subnetGWLBeAz1" {
 
 resource "aws_subnet" "subnetGWLBeAz2" {
   vpc_id            = aws_vpc.WebAppVpc.id
-  cidr_block        = "10.1.110.0/24"
+  cidr_block        = "10.1.101.0/24"
   availability_zone = local.awsAz1
 
   tags = {
@@ -69,7 +72,7 @@ resource "aws_subnet" "subnetFrontEndAz2" {
 
 resource "aws_subnet" "subnetWebAppAz1" {
   vpc_id            = aws_vpc.WebAppVpc.id
-  cidr_block        = "10.1.52.0/24"
+  cidr_block        = "10.1.20.0/24"
   availability_zone = local.awsAz1
 
   tags = {
@@ -79,7 +82,7 @@ resource "aws_subnet" "subnetWebAppAz1" {
 }
 resource "aws_subnet" "subnetWebAppAz2" {
   vpc_id            = aws_vpc.WebAppVpc.id
-  cidr_block        = "10.1.152.0/24"
+  cidr_block        = "10.1.120.0/24"
   availability_zone = local.awsAz2
 
   tags = {
