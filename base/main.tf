@@ -10,9 +10,178 @@ locals {
   awsAz1 = var.awsAz1 != null ? var.awsAz1 : data.aws_availability_zones.available.names[0]
   awsAz2 = var.awsAz2 != null ? var.awsAz1 : data.aws_availability_zones.available.names[1]
 }
-
 ##################################################################### Locals #############################################################
 
+##################################################################### Internet VPC #############################################################
+resource "aws_vpc" "WebAppVpc" {
+  cidr_block = "10.1.0.0/16"
+  tags = {
+    Name  = "${var.projectPrefix}-WebAppVpc-${random_id.buildSuffix.hex}"
+    Owner = var.resourceOwner
+  }
+}
+
+# Subnets
+
+resource "aws_subnet" "subnetInternetNatgAz1" {
+  vpc_id            = aws_vpc.WebAppVpc.id
+  cidr_block        = "10.1.53.0/24"
+  availability_zone = local.awsAz1
+
+  tags = {
+    Name  = "${var.projectPrefix}-subnetInternetNatgAz1-${random_id.buildSuffix.hex}"
+    Owner = var.resourceOwner
+  }
+}
+
+resource "aws_subnet" "subnetInternetNatgAz2" {
+  vpc_id            = aws_vpc.WebAppVpc.id
+  cidr_block        = "10.1.153.0/24"
+  availability_zone = local.awsAz1
+
+  tags = {
+    Name  = "${var.projectPrefix}-subnetInternetNatgAz2-${random_id.buildSuffix.hex}"
+    Owner = var.resourceOwner
+  }
+}
+
+resource "aws_subnet" "subnetInternetJumphostAz1" {
+  vpc_id            = aws_vpc.WebAppVpc.id
+  cidr_block        = "10.1.10.0/24"
+  availability_zone = local.awsAz1
+
+  tags = {
+    Name  = "${var.projectPrefix}-subnetInternetJumphostAz1-${random_id.buildSuffix.hex}"
+    Owner = var.resourceOwner
+  }
+}
+
+resource "aws_subnet" "subnetInternetJumphostAz2" {
+  vpc_id            = aws_vpc.WebAppVpc.id
+  cidr_block        = "10.1.110.0/24"
+  availability_zone = local.awsAz2
+
+  tags = {
+    Name  = "${var.projectPrefix}-subnetInternetJumphostAz2-${random_id.buildSuffix.hex}"
+    Owner = var.resourceOwner
+  }
+}
+
+resource "aws_subnet" "subnetInternetTgwAttachmentAz1" {
+  vpc_id            = aws_vpc.WebAppVpc.id
+  cidr_block        = "10.1.52.0/24"
+  availability_zone = local.awsAz1
+
+  tags = {
+    Name  = "${var.projectPrefix}-subnetInternetJumphostAz1-${random_id.buildSuffix.hex}"
+    Owner = var.resourceOwner
+  }
+}
+resource "aws_subnet" "subnetInternetTgwAttachmentAz2" {
+  vpc_id            = aws_vpc.WebAppVpc.id
+  cidr_block        = "10.1.152.0/24"
+  availability_zone = local.awsAz2
+
+  tags = {
+    Name  = "${var.projectPrefix}-subnetInternetJumphostAz2-${random_id.buildSuffix.hex}"
+    Owner = var.resourceOwner
+  }
+}
+
+# Internet Gateway
+
+resource "aws_internet_gateway" "WebAppVpcIgw" {
+  vpc_id = aws_vpc.WebAppVpc.id
+
+  tags = {
+    Name  = "${var.projectPrefix}-WebAppVpcIgw-${random_id.buildSuffix.hex}"
+    Owner = var.resourceOwner
+  }
+}
+
+#nat gatewaty
+
+resource "aws_eip" "WebAppVpcNatgwAz1Eip" {
+  vpc = true
+  tags = {
+    Name  = "${var.projectPrefix}-WebAppVpcNatgwAz1Eip-${random_id.buildSuffix.hex}"
+    Owner = var.resourceOwner
+  }
+}
+
+resource "aws_eip" "WebAppVpcNatgwAz2Eip" {
+  vpc = true
+  tags = {
+    Name  = "${var.projectPrefix}-WebAppVpcNatgwAz2Eip-${random_id.buildSuffix.hex}"
+    Owner = var.resourceOwner
+  }
+}
+
+resource "aws_nat_gateway" "WebAppVpcNatgwAz1" {
+  allocation_id = aws_eip.WebAppVpcNatgwAz1Eip.id
+  subnet_id     = aws_subnet.subnetInternetNatgAz1.id
+}
+
+resource "aws_nat_gateway" "WebAppVpcNatgwAz2" {
+  allocation_id = aws_eip.WebAppVpcNatgwAz2Eip.id
+  subnet_id     = aws_subnet.subnetInternetNatgAz2.id
+}
+
+# Route Tables
+
+resource "aws_route_table" "rtWebAppVpc" {
+  vpc_id = aws_vpc.WebAppVpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.WebAppVpcIgw.id
+  }
+  route {
+    cidr_block         = "10.0.0.0/8"
+    transit_gateway_id = aws_ec2_transit_gateway.tgw.id
+  }
+  tags = {
+    Name  = "${var.projectPrefix}-rtWebAppVpc-${random_id.buildSuffix.hex}"
+    Owner = var.resourceOwner
+  }
+}
+
+resource "aws_route_table" "rtWebAppVpcTgwAttachmentSubnets" {
+  vpc_id = aws_vpc.WebAppVpc.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.WebAppVpcNatgwAz1.id
+  }
+  tags = {
+    Name  = "${var.projectPrefix}-rtWebAppVpcTgwAttachmentSubnets-${random_id.buildSuffix.hex}"
+    Owner = var.resourceOwner
+  }
+}
+
+#route table associations
+
+resource "aws_main_route_table_association" "WebAppVpcRtbAssociation" {
+  vpc_id         = aws_vpc.WebAppVpc.id
+  route_table_id = aws_route_table.rtWebAppVpc.id
+}
+
+resource "aws_route_table_association" "WebAppVpcTgwAttachmentSubnetAz1RtbAssociation" {
+  subnet_id      = aws_subnet.subnetInternetTgwAttachmentAz1.id
+  route_table_id = aws_route_table.rtWebAppVpcTgwAttachmentSubnets.id
+}
+
+resource "aws_route_table_association" "WebAppVpcTgwAttachmentSubnetAz2RtbAssociation" {
+  subnet_id      = aws_subnet.subnetInternetTgwAttachmentAz2.id
+  route_table_id = aws_route_table.rtWebAppVpcTgwAttachmentSubnets.id
+}
+##################################################################### Internet VPC #############################################################
+
+
+
+
+
+/*
 ##################################################################### Transit gateway #############################################################
 resource "aws_ec2_transit_gateway" "tgw" {
   description                     = "Transit Gateway"
@@ -47,7 +216,7 @@ resource "aws_ec2_transit_gateway_route_table" "rtTgwSecurity" {
 }
 resource "aws_ec2_transit_gateway_route" "securityDefaultRoute" {
   destination_cidr_block         = "0.0.0.0/0"
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.internetVpcTgwAttachment.id
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.WebAppVpcTgwAttachment.id
   transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.rtTgwSecurity.id
 }
 
@@ -63,7 +232,7 @@ resource "aws_ec2_transit_gateway_route_table_propagation" "spoke20RtbAssociatio
 }
 
 resource "aws_ec2_transit_gateway_route_table_propagation" "internetRtbAssociation" {
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.internetVpcTgwAttachment.id
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.WebAppVpcTgwAttachment.id
   transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.rtTgwSecurity.id
 }
 
@@ -88,196 +257,26 @@ resource "aws_ec2_transit_gateway_route_table_association" "securityVpcRtAssocia
 }
 
 ################### TGW - Internet VPC stuff #######
-resource "aws_ec2_transit_gateway_vpc_attachment" "internetVpcTgwAttachment" {
+resource "aws_ec2_transit_gateway_vpc_attachment" "WebAppVpcTgwAttachment" {
   subnet_ids                                      = [aws_subnet.subnetInternetTgwAttachmentAz1.id, aws_subnet.subnetInternetTgwAttachmentAz2.id]
   transit_gateway_id                              = aws_ec2_transit_gateway.tgw.id
-  vpc_id                                          = aws_vpc.internetVpc.id
+  vpc_id                                          = aws_vpc.WebAppVpc.id
   transit_gateway_default_route_table_association = false
   transit_gateway_default_route_table_propagation = false
   tags = {
-    Name  = "${var.projectPrefix}-internetVpcTgwAttachment-${random_id.buildSuffix.hex}"
+    Name  = "${var.projectPrefix}-WebAppVpcTgwAttachment-${random_id.buildSuffix.hex}"
     Owner = var.resourceOwner
   }
   depends_on = [aws_ec2_transit_gateway.tgw]
 }
 
-resource "aws_ec2_transit_gateway_route_table_association" "internetVpcRtAssociation" {
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.internetVpcTgwAttachment.id
+resource "aws_ec2_transit_gateway_route_table_association" "WebAppVpcRtAssociation" {
+  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.WebAppVpcTgwAttachment.id
   transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.rtTgwIngress.id
 }
-
-
-
-
 ##################################################################### Transit gateway #############################################################
 
-##################################################################### Internet VPC #############################################################
-resource "aws_vpc" "internetVpc" {
-  cidr_block = "10.1.0.0/16"
-  tags = {
-    Name  = "${var.projectPrefix}-internetVpc-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
 
-# Subnets
-
-resource "aws_subnet" "subnetInternetNatgAz1" {
-  vpc_id            = aws_vpc.internetVpc.id
-  cidr_block        = "10.1.53.0/24"
-  availability_zone = local.awsAz1
-
-  tags = {
-    Name  = "${var.projectPrefix}-subnetInternetNatgAz1-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-resource "aws_subnet" "subnetInternetNatgAz2" {
-  vpc_id            = aws_vpc.internetVpc.id
-  cidr_block        = "10.1.153.0/24"
-  availability_zone = local.awsAz1
-
-  tags = {
-    Name  = "${var.projectPrefix}-subnetInternetNatgAz2-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-resource "aws_subnet" "subnetInternetJumphostAz1" {
-  vpc_id            = aws_vpc.internetVpc.id
-  cidr_block        = "10.1.10.0/24"
-  availability_zone = local.awsAz1
-
-  tags = {
-    Name  = "${var.projectPrefix}-subnetInternetJumphostAz1-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-resource "aws_subnet" "subnetInternetJumphostAz2" {
-  vpc_id            = aws_vpc.internetVpc.id
-  cidr_block        = "10.1.110.0/24"
-  availability_zone = local.awsAz2
-
-  tags = {
-    Name  = "${var.projectPrefix}-subnetInternetJumphostAz2-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-resource "aws_subnet" "subnetInternetTgwAttachmentAz1" {
-  vpc_id            = aws_vpc.internetVpc.id
-  cidr_block        = "10.1.52.0/24"
-  availability_zone = local.awsAz1
-
-  tags = {
-    Name  = "${var.projectPrefix}-subnetInternetJumphostAz1-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-resource "aws_subnet" "subnetInternetTgwAttachmentAz2" {
-  vpc_id            = aws_vpc.internetVpc.id
-  cidr_block        = "10.1.152.0/24"
-  availability_zone = local.awsAz2
-
-  tags = {
-    Name  = "${var.projectPrefix}-subnetInternetJumphostAz2-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-# Internet Gateway
-
-resource "aws_internet_gateway" "internetVpcIgw" {
-  vpc_id = aws_vpc.internetVpc.id
-
-  tags = {
-    Name  = "${var.projectPrefix}-internetVpcIgw-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-#nat gatewaty
-
-resource "aws_eip" "internetVpcNatgwAz1Eip" {
-  vpc = true
-  tags = {
-    Name  = "${var.projectPrefix}-internetVpcNatgwAz1Eip-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-resource "aws_eip" "internetVpcNatgwAz2Eip" {
-  vpc = true
-  tags = {
-    Name  = "${var.projectPrefix}-internetVpcNatgwAz2Eip-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-resource "aws_nat_gateway" "internetVpcNatgwAz1" {
-  allocation_id = aws_eip.internetVpcNatgwAz1Eip.id
-  subnet_id     = aws_subnet.subnetInternetNatgAz1.id
-}
-
-resource "aws_nat_gateway" "internetVpcNatgwAz2" {
-  allocation_id = aws_eip.internetVpcNatgwAz2Eip.id
-  subnet_id     = aws_subnet.subnetInternetNatgAz2.id
-}
-
-# Route Tables
-
-resource "aws_route_table" "rtInternetVpc" {
-  vpc_id = aws_vpc.internetVpc.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.internetVpcIgw.id
-  }
-  route {
-    cidr_block         = "10.0.0.0/8"
-    transit_gateway_id = aws_ec2_transit_gateway.tgw.id
-  }
-  tags = {
-    Name  = "${var.projectPrefix}-rtInternetVpc-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-resource "aws_route_table" "rtInternetVpcTgwAttachmentSubnets" {
-  vpc_id = aws_vpc.internetVpc.id
-
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.internetVpcNatgwAz1.id
-  }
-  tags = {
-    Name  = "${var.projectPrefix}-rtInternetVpcTgwAttachmentSubnets-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-#route table associations
-
-resource "aws_main_route_table_association" "internetVpcRtbAssociation" {
-  vpc_id         = aws_vpc.internetVpc.id
-  route_table_id = aws_route_table.rtInternetVpc.id
-}
-
-resource "aws_route_table_association" "internetVpcTgwAttachmentSubnetAz1RtbAssociation" {
-  subnet_id      = aws_subnet.subnetInternetTgwAttachmentAz1.id
-  route_table_id = aws_route_table.rtInternetVpcTgwAttachmentSubnets.id
-}
-
-resource "aws_route_table_association" "internetVpcTgwAttachmentSubnetAz2RtbAssociation" {
-  subnet_id      = aws_subnet.subnetInternetTgwAttachmentAz2.id
-  route_table_id = aws_route_table.rtInternetVpcTgwAttachmentSubnets.id
-}
-
-
-
-########################################################################################################################################################
 
 ##################################################################### Security VPC #############################################################
 
@@ -496,8 +495,8 @@ locals {
 
   vpcs = {
 
-    internetVpcData = {
-      vpcId    = aws_vpc.internetVpc.id
+    WebAppVpcData = {
+      vpcId    = aws_vpc.WebAppVpc.id
       subnetId = aws_subnet.subnetInternetJumphostAz1.id
     }
 
@@ -564,5 +563,6 @@ module "jumphost" {
   keyName       = aws_key_pair.deployer.id
   mgmtSubnet    = each.value["subnetId"]
   securityGroup = aws_security_group.secGroupWorkstation[each.key].id
-  associateEIP  = each.key == "internetVpcData" ? true : false
+  associateEIP  = each.key == "WebAppVpcData" ? true : false
 }
+/*

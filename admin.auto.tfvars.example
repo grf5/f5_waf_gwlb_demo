@@ -1,4 +1,4 @@
-resourceOwner    = "fred"
-awsRegion        = "us-west-2"
+resourceOwner    = "g-rob"
+awsRegion        = "us-east-2"
 sshPublicKey     = "ssh-rsa AAA"
-projectPrefix    = "fw-ingress-inter-vpc-gwlb"
+projectPrefix    = "comcast-waf-gwlb"

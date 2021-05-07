@@ -3,11 +3,11 @@ resource "random_id" "buildSuffix" {
 }
 variable "projectPrefix" {
   description = "projectPrefix name for tagging"
-  default     = "fw-inter-vpc"
+  default     = "comcast-waf"
 }
 variable "resourceOwner" {
   description = "Owner of the deployment for tagging purposes"
-  default     = "elsa"
+  default     = "grobinson"
 }
 variable "awsRegion" {
   description = "aws region"
