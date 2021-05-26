@@ -11,279 +11,63 @@ locals {
   awsAz2 = var.awsAz2 != null ? var.awsAz1 : data.aws_availability_zones.available.names[1]
 }
 
-##################################################################### Locals #############################################################
+##################################################################### Security Services VPC #############################################################
 
-##################################################################### Transit gateway #############################################################
-resource "aws_ec2_transit_gateway" "tgw" {
-  description                     = "Transit Gateway"
-  default_route_table_association = "disable"
-  default_route_table_propagation = "disable"
+resource "aws_vpc" "securityServicesVPC" {
+  cidr_block = "10.250.0.0/16"
   tags = {
-    Name  = "${var.projectPrefix}-tgw-${random_id.buildSuffix.hex}"
+    Name  = "${var.projectPrefix}-securityServicesVPC-${random_id.buildSuffix.hex}"
     Owner = var.resourceOwner
   }
 }
 
-resource "aws_ec2_transit_gateway_route_table" "rtTgwIngress" {
-  transit_gateway_id = aws_ec2_transit_gateway.tgw.id
-  tags = {
-    Name  = "${var.projectPrefix}-rtTgwIngress-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-  depends_on = [aws_ec2_transit_gateway.tgw]
-}
-resource "aws_ec2_transit_gateway_route" "ingressDefaultRoute" {
-  destination_cidr_block         = "0.0.0.0/0"
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.securityVpcTgwAttachment.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.rtTgwIngress.id
-}
-resource "aws_ec2_transit_gateway_route_table" "rtTgwSecurity" {
-  transit_gateway_id = aws_ec2_transit_gateway.tgw.id
-  tags = {
-    Name  = "${var.projectPrefix}-rtTgwSecurity-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-  depends_on = [aws_ec2_transit_gateway.tgw]
-}
-resource "aws_ec2_transit_gateway_route" "securityDefaultRoute" {
-  destination_cidr_block         = "0.0.0.0/0"
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.internetVpcTgwAttachment.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.rtTgwSecurity.id
-}
-
-#Route propogations
-resource "aws_ec2_transit_gateway_route_table_propagation" "spoke10RtbAssociation" {
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.spoke10VpcTgwAttachment.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.rtTgwSecurity.id
-}
-
-resource "aws_ec2_transit_gateway_route_table_propagation" "spoke20RtbAssociation" {
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.spoke20VpcTgwAttachment.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.rtTgwSecurity.id
-}
-
-resource "aws_ec2_transit_gateway_route_table_propagation" "internetRtbAssociation" {
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.internetVpcTgwAttachment.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.rtTgwSecurity.id
-}
-
-################### TGW - Security VPC stuff #######
-resource "aws_ec2_transit_gateway_vpc_attachment" "securityVpcTgwAttachment" {
-  subnet_ids                                      = [aws_subnet.securityVpcSubnetTgwAttachmentAz1.id, aws_subnet.securityVpcSubnetTgwAttachmentAz2.id]
-  transit_gateway_id                              = aws_ec2_transit_gateway.tgw.id
-  vpc_id                                          = module.gwlb-bigip.vpcs["vpcGwlb"]
-  appliance_mode_support                          = enable # see https://docs.aws.amazon.com/vpc/latest/tgw/transit-gateway-appliance-scenario.html
-  transit_gateway_default_route_table_association = false
-  transit_gateway_default_route_table_propagation = false
-  tags = {
-    Name  = "${var.projectPrefix}-securityVpcTgwAttachment-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-  depends_on = [aws_ec2_transit_gateway.tgw]
-}
-
-resource "aws_ec2_transit_gateway_route_table_association" "securityVpcRtAssociation" {
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.securityVpcTgwAttachment.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.rtTgwSecurity.id
-}
-
-################### TGW - Internet VPC stuff #######
-resource "aws_ec2_transit_gateway_vpc_attachment" "internetVpcTgwAttachment" {
-  subnet_ids                                      = [aws_subnet.subnetInternetTgwAttachmentAz1.id, aws_subnet.subnetInternetTgwAttachmentAz2.id]
-  transit_gateway_id                              = aws_ec2_transit_gateway.tgw.id
-  vpc_id                                          = aws_vpc.internetVpc.id
-  transit_gateway_default_route_table_association = false
-  transit_gateway_default_route_table_propagation = false
-  tags = {
-    Name  = "${var.projectPrefix}-internetVpcTgwAttachment-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-  depends_on = [aws_ec2_transit_gateway.tgw]
-}
-
-resource "aws_ec2_transit_gateway_route_table_association" "internetVpcRtAssociation" {
-  transit_gateway_attachment_id  = aws_ec2_transit_gateway_vpc_attachment.internetVpcTgwAttachment.id
-  transit_gateway_route_table_id = aws_ec2_transit_gateway_route_table.rtTgwIngress.id
-}
-
-
-
-
-##################################################################### Transit gateway #############################################################
-
-##################################################################### Internet VPC #############################################################
-resource "aws_vpc" "internetVpc" {
-  cidr_block = "10.1.0.0/16"
-  tags = {
-    Name  = "${var.projectPrefix}-internetVpc-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-# Subnets
-
-resource "aws_subnet" "subnetInternetNatgAz1" {
-  vpc_id            = aws_vpc.internetVpc.id
-  cidr_block        = "10.1.53.0/24"
+resource "aws_subnet" "securityServicesSubnetAZ1" {
+  vpc_id = aws_vpc.securityServicesVPC.id
+  cidr_block = "10.250.150.0/24"
   availability_zone = local.awsAz1
-
   tags = {
-    Name  = "${var.projectPrefix}-subnetInternetNatgAz1-${random_id.buildSuffix.hex}"
+    Name  = "${var.projectPrefix}-securityServicesSubnetAZ1-${random_id.buildSuffix.hex}"
     Owner = var.resourceOwner
   }
 }
 
-resource "aws_subnet" "subnetInternetNatgAz2" {
-  vpc_id            = aws_vpc.internetVpc.id
-  cidr_block        = "10.1.153.0/24"
-  availability_zone = local.awsAz1
-
-  tags = {
-    Name  = "${var.projectPrefix}-subnetInternetNatgAz2-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-resource "aws_subnet" "subnetInternetJumphostAz1" {
-  vpc_id            = aws_vpc.internetVpc.id
-  cidr_block        = "10.1.10.0/24"
-  availability_zone = local.awsAz1
-
-  tags = {
-    Name  = "${var.projectPrefix}-subnetInternetJumphostAz1-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-resource "aws_subnet" "subnetInternetJumphostAz2" {
-  vpc_id            = aws_vpc.internetVpc.id
-  cidr_block        = "10.1.110.0/24"
+resource "aws_subnet" "securityServicesSubnetAZ2" {
+  vpc_id = aws_vpc.securityServicesVPC.id
+  cidr_block = "10.250.250.0/24"
   availability_zone = local.awsAz2
-
   tags = {
-    Name  = "${var.projectPrefix}-subnetInternetJumphostAz2-${random_id.buildSuffix.hex}"
+    Name  = "${var.projectPrefix}-securityServicesSubnetAZ2-${random_id.buildSuffix.hex}"
     Owner = var.resourceOwner
   }
 }
 
-resource "aws_subnet" "subnetInternetTgwAttachmentAz1" {
-  vpc_id            = aws_vpc.internetVpc.id
-  cidr_block        = "10.1.52.0/24"
-  availability_zone = local.awsAz1
-
+resource "aws_internet_gateway" "securityServicesIGW" {
+  vpc_id = aws_vpc.securityServicesVPC.id
   tags = {
-    Name  = "${var.projectPrefix}-subnetInternetJumphostAz1-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-resource "aws_subnet" "subnetInternetTgwAttachmentAz2" {
-  vpc_id            = aws_vpc.internetVpc.id
-  cidr_block        = "10.1.152.0/24"
-  availability_zone = local.awsAz2
-
-  tags = {
-    Name  = "${var.projectPrefix}-subnetInternetJumphostAz2-${random_id.buildSuffix.hex}"
+    Name  = "${var.projectPrefix}-securityServicesIGW-${random_id.buildSuffix.hex}"
     Owner = var.resourceOwner
   }
 }
 
-# Internet Gateway
-
-resource "aws_internet_gateway" "internetVpcIgw" {
-  vpc_id = aws_vpc.internetVpc.id
-
-  tags = {
-    Name  = "${var.projectPrefix}-internetVpcIgw-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-#nat gatewaty
-
-resource "aws_eip" "internetVpcNatgwAz1Eip" {
-  vpc = true
-  tags = {
-    Name  = "${var.projectPrefix}-internetVpcNatgwAz1Eip-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-resource "aws_eip" "internetVpcNatgwAz2Eip" {
-  vpc = true
-  tags = {
-    Name  = "${var.projectPrefix}-internetVpcNatgwAz2Eip-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
-}
-
-resource "aws_nat_gateway" "internetVpcNatgwAz1" {
-  allocation_id = aws_eip.internetVpcNatgwAz1Eip.id
-  subnet_id     = aws_subnet.subnetInternetNatgAz1.id
-}
-
-resource "aws_nat_gateway" "internetVpcNatgwAz2" {
-  allocation_id = aws_eip.internetVpcNatgwAz2Eip.id
-  subnet_id     = aws_subnet.subnetInternetNatgAz2.id
-}
-
-# Route Tables
-
-resource "aws_route_table" "rtInternetVpc" {
-  vpc_id = aws_vpc.internetVpc.id
+resource "aws_route_table" "securityServicesMainRT" {
+  vpc_id = aws_vpc.securityServicesVPC.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.internetVpcIgw.id
-  }
-  route {
-    cidr_block         = "10.0.0.0/8"
-    transit_gateway_id = aws_ec2_transit_gateway.tgw.id
+    gateway_id = aws_internet_gateway.securityServicesIGW.id
   }
   tags = {
-    Name  = "${var.projectPrefix}-rtInternetVpc-${random_id.buildSuffix.hex}"
+    Name  = "${var.projectPrefix}-securityServicesMainRT-${random_id.buildSuffix.hex}"
     Owner = var.resourceOwner
   }
 }
 
-resource "aws_route_table" "rtInternetVpcTgwAttachmentSubnets" {
-  vpc_id = aws_vpc.internetVpc.id
-
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.internetVpcNatgwAz1.id
-  }
-  tags = {
-    Name  = "${var.projectPrefix}-rtInternetVpcTgwAttachmentSubnets-${random_id.buildSuffix.hex}"
-    Owner = var.resourceOwner
-  }
+resource "aws_main_route_table_association" "securityServicesMainRTAssociation" {
+  vpc_id         = aws_vpc.securityServicesVPC.id
+  route_table_id = aws_route_table.securityServicesMainRT.id
 }
 
-#route table associations
-
-resource "aws_main_route_table_association" "internetVpcRtbAssociation" {
-  vpc_id         = aws_vpc.internetVpc.id
-  route_table_id = aws_route_table.rtInternetVpc.id
-}
-
-resource "aws_route_table_association" "internetVpcTgwAttachmentSubnetAz1RtbAssociation" {
-  subnet_id      = aws_subnet.subnetInternetTgwAttachmentAz1.id
-  route_table_id = aws_route_table.rtInternetVpcTgwAttachmentSubnets.id
-}
-
-resource "aws_route_table_association" "internetVpcTgwAttachmentSubnetAz2RtbAssociation" {
-  subnet_id      = aws_subnet.subnetInternetTgwAttachmentAz2.id
-  route_table_id = aws_route_table.rtInternetVpcTgwAttachmentSubnets.id
-}
-
-
-
-########################################################################################################################################################
-
-##################################################################### Security VPC #############################################################
-
-##################################################################### Security VPC #############################################################
-
-
+/*
 #Spoke10 VPC
 module "spoke10Vpc" {
   source  = "terraform-aws-modules/vpc/aws"
@@ -299,7 +83,7 @@ module "spoke10Vpc" {
 
 }
 
-resource "aws_route" "spoke10VpcDatabaseRtb" {
+resoure "aws_route" "spoke10VpcDatabaseRtb" {
   route_table_id         = module.spoke10Vpc.database_route_table_ids[0]
   destination_cidr_block = "0.0.0.0/0"
   transit_gateway_id     = aws_ec2_transit_gateway.tgw.id
@@ -554,7 +338,6 @@ resource "aws_security_group" "secGroupWorkstation" {
   }
 }
 
-
 module "jumphost" {
   for_each      = local.vpcs
   source        = "../../../../modules/aws/terraform/workstation/"
@@ -566,3 +349,4 @@ module "jumphost" {
   securityGroup = aws_security_group.secGroupWorkstation[each.key].id
   associateEIP  = each.key == "internetVpcData" ? true : false
 }
+*/

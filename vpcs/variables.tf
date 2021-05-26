@@ -3,7 +3,7 @@ resource "random_id" "buildSuffix" {
 }
 variable "projectPrefix" {
   description = "projectPrefix name for tagging"
-  default     = "comcast-waf"
+  default     = "gwlb-bigip"
 }
 variable "resourceOwner" {
   description = "Owner of the deployment for tagging purposes"
